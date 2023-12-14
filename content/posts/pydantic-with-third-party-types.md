@@ -8,14 +8,14 @@ Validating and structuring data models with [Pydantic](https://docs.pydantic.dev
 
 ----
 
-There are several straight-forward approaches if you only need to [validate](https://docs.pydantic.dev/latest/concepts/validators/) or [serialize](https://docs.pydantic.dev/latest/concepts/serialization/) custom types. It gets tricker if you also want schemas. The process follows the Pydantic [documentation](https://docs.pydantic.dev/latest/concepts/types/#customizing-validation-with-__get_pydantic_core_schema__) principles. The basic steps are:
+There are several straight-forward approaches if you only need to [validate](https://docs.pydantic.dev/latest/concepts/validators/) or [serialize](https://docs.pydantic.dev/latest/concepts/serialization/) custom types. It gets tricker if you also want schemas. The process here follows the principles from the Pydantic [documentation](https://docs.pydantic.dev/latest/concepts/types/#customizing-validation-with-__get_pydantic_core_schema__):
 
-1. Create Pydantic a model that represents the third-party type
-2. Modify the Pydantic model's validation method to return an instance of the *third-party* type instead of the Pydantic model
+1. Create a Pydantic model that represents the third-party type
+2. Modify the model's validation function to return an instance of the *third-party* type
 3. Add metadata to the third-party type that tells Pydantic how to validate, serialize, and generate schemas for it
 
 ----
-## The `relaitvedelta` type
+## Exploring `relativedelta`
 
 `relativedelta` is a date offset type. It's similar to the `datetime.timedelta` type, but it includes other relative offsets such as `years` and `months` as well absolute offests such as the year or the calendar day of the month. Relative offsets end with an "s" (e.g. `month=1` offsets to January, `months=1` increments by one month).
 
