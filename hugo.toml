@@ -4,7 +4,7 @@ title = 'jrdnh'
 theme = 'anubis'
 paginate = 10
 #disqusShortname = "yourdiscussshortname"
-googleAnalytics = "G-12345"
+#googleAnalytics = "G-12345"
 enableRobotsTXT = true
 
 #[menu]
@@ -28,7 +28,7 @@ sectionsWithFullContentOnListPage = [ "notes",]
 readMore = false
 readNextPosts = 5
 disableSummary = false
-toc = true
+toc = false
 tocWordCount = 300
 copyCodeButton = true
 rssAsSocialIcon = false
