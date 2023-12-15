@@ -56,9 +56,9 @@ We can ignore `_has_time` which is set at initialization. All of the other attri
 `weekday` uses [slots](https://docs.python.org/3/reference/datamodel.html#slots) and has the following state:
 
 ```python
-from dateutil._common import weekday as _weekday
+from dateutil._common import weekday
 
->>> _weekday(0).__slots__
+weekday(0).__slots__
 # ['weekday', 'n']
 ```
 
@@ -92,18 +92,18 @@ class WeekdayAnnotations(BaseModel):
     @model_validator(mode="wrap")
     def _validate(value, handler) -> relativedelta:
         # if already dateutil._common.weekday instance, return it
-        if isinstance(value, _weekday):
+        if isinstance(value, weekday):
             return value
 
         # otherwise run model validation which returns either a
         # a WeekdayAnnotations or dateutil._common.weekday object
         validated = handler(value)
 
-        if isinstance(validated, _weekday):
+        if isinstance(validated, weekday):
             return validated
 
         kwargs = {k: v for k, v in dict(validated).items() if v is not None}
-        return _weekday(**kwargs)
+        return weekday(**kwargs)
 ```
 
 For types that use `__slots__`, we also need to define a serialization function. 
@@ -113,12 +113,12 @@ For types that use `__slots__`, we also need to define a serialization function.
 Defining a [serialization](https://docs.pydantic.dev/latest/api/functional_serializers/#pydantic.functional_serializers.model_serializer) function is similar defining a validation function, except the serialization modes are different. We'll use the `"plain"` mode which just replaces the built-in serializtion process the our custom function.
 
 ```python 
-from pydantic import model_validator
+from pydantic import model_serializer
 
 class WeekdayAnnotations(BaseModel):
     ...
     @model_serializer(mode="plain")
-    def _serialize(self: _weekday) -> dict[str, Any]:
+    def _serialize(self: weekday):
         return {"weekday": self.weekday, "n": self.n}
 ```
 
@@ -131,12 +131,21 @@ The final step is to tell Pydantic to use the validation, serialization, and sch
 ```python
 from typing import Annotated
 
-Weekday = Annotated[_weekday, WeekdayAnnotations]
+Weekday = Annotated[weekday, WeekdayAnnotations]
+```
+
+If you examine `Weekday`'s metadata, you'll see that it contains the `WeekdayAnnotations` model.
+
+```python
+Weekday.__metadata__
+# (<class '__main__.WeekdayAnnotations'>,)
 ```
 
 Now we can use `Weekday` directly using `pydantic.TypeAdapter`.
 
 ```python
+from pydantic import TypeAdapter
+
 WeekdayAdapter = TypeAdapter(Weekday)
 WeekdayAdapter.json_schema()
 # {'properties': {'weekday': {'maximum': 6, 'minimum': 0, 'title': 'Weekday', 'type': 'integer'}, 'n': {'anyOf': [{'type': 'integer'}, {'type': 'null'}], 'default': None, 'title': 'N'}}, 'required': ['weekday'], 'title': 'WeekdayAnnotations', 'type': 'object'}
@@ -148,7 +157,7 @@ WeekdayAdapter.dump_python(my_day)
 Notice that values returned by `WeekdayAdapter.validate_python` are pure `dateutil._common.weekday` objects, they are *not* any sort of wrapped object.
 
 ```python
-type(my_day) == _weekday
+type(my_day) == weekday
 # True
 ```
 
@@ -160,9 +169,9 @@ class Foo(BaseModel):
 
 Foo(day={"weekday": 2, "n": 3})
 # Foo(day=WE(+3))
-Foo(day=_weekday(2, 3))
+Foo(day=weekday(2, 3))
 # Foo(day=WE(+3))
-type(Foo(day=_weekday(2, 3)).day) == _weekday
+type(Foo(day=weekday(2, 3)).day) == weekday
 # True
 ```
 
@@ -243,6 +252,8 @@ print(json.dumps(model_json_schema(SchemaTest, mode='serialization'), indent=2))
 Similar to the `WeekdayAnnotations` model, we need to modify the validation function to return the third-party type instead of the Pydantic model.
 
 ```python
+from pydantic_core import core_schema
+
 class RelativeDeltaAnnotation(BaseModel):
     ...
     @model_validator(mode="wrap")
