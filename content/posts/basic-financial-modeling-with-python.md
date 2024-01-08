@@ -10,6 +10,11 @@ Excel is fantastic, but there a times I wish it had the full power of programmin
 
 This article plays with an approach to fundamental modeling in Python. I haven't seen other robust approaches, but I'd be interested in hearing about them![^2]
 
+* [The setup--a time-based loop](#the-setup--a-time-based-loop)
+* [Refactor to make it a bit more generic](#refactor-to-make-it-a-bit-more-generic)
+* [Prettier outputs](#prettier-outputs)
+* [Saving and loading models](#saving-and-loading-models)
+
 ## The setup--a time-based loop
 
 I'd like to be able to do something like this where `from_date` and `to_date` can be any two arbitrary dates. In Excel, you're generally limited to calculating values at whatever frequency columns represent (e.g. monthly, quarterly, annually). Sometimes it's helpful to have intra-period granularity to capture specific events or accruals. Since we're not restricted to a graphical grid, there's no reason to limit ourselves to a fixed intervals.
