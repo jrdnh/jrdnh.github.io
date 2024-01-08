@@ -4,26 +4,26 @@ date = 2024-01-07T15:28:54-05:00
 draft = false
 +++
 
-Spreadsheets remain undefeated for financial modeling[^1]. There are a number of generic tools (e.g. [Anaplan](https://www.anaplan.com)) and industry specific tools (e.g. [Argus](https://www.altusgroup.com/argus/)), but they are generally only used in portfolio management-type scenarios where scale, structure, or auditability are valued over flexibility. They usually are not used in underwriting and valuation. Even then, many companies still use Excel all activities.
+Spreadsheets remain undefeated for financial modeling[^1]. There are a number of generic tools (e.g. [Anaplan](https://www.anaplan.com)) and industry specific tools (e.g. [Argus](https://www.altusgroup.com/argus/)), but they are best used in portfolio management-type scenarios where scale, structure, or auditability are valued over flexibility. Even then, many companies still use Excel for these activities. In underwriting and valuation situtaions, Excel dominates.
 
-Excel is fantastic, but there a times I wish it had the full power of programming environment. It struggles with certain data transformations (e.g. unique attribute counts with filtering and grouping) and importing/exporting data to/from external sources.
+Excel is fantastic, but there a times I wish it had the full power of programming environment. Excel struggles with certain data transformations (e.g. unique attribute counts with filtering and grouping) and importing/exporting data to/from external sources.
 
 This article plays with an approach to fundamental modeling in Python. I haven't seen other robust approaches, but I'd be interested in hearing about them![^2]
 
-## The setup--a time-based event loop
+## The setup--a time-based loop
 
-I'd like to be able to do something like this where `from_date` and `to_date` can be any two arbitrary dates. In Excel, you're generally limited to calculating values at whatever frequency columns represent (e.g. monthly, quarterly, annually). Sometimes it's helpful to have intra-period granularity to capture specific events or accruals. Since we aren't restricted to a grid anymore, why not just use the actual dates?
+I'd like to be able to do something like this where `from_date` and `to_date` can be any two arbitrary dates. In Excel, you're generally limited to calculating values at whatever frequency columns represent (e.g. monthly, quarterly, annually). Sometimes it's helpful to have intra-period granularity to capture specific events or accruals. Since we're not restricted to a graphical grid, there's no reason to limit ourselves to a fixed intervals.
 
 ```python
 obj.revenue(from_date, to_date)
 # sum of revenue between dates
 ```
 
-Many time series are modeled by growing some base value at a periodically compounding rate. In the most basic cases, such series can be modeled as a geometric series. In most real-world scenarios, growth is more complex and needs to be modeled iteratively.
+Cash flows are frequently are modeled by growing some starting value at a periodically compounding rate. In the most basic cases, such series can be modeled as a geometric series. In most real-world scenarios, growth is more complex and needs to be modeled iteratively.
 
-> A recursive approach would be nice. Unfortnately, when I've tried to create even modestly large models recursively the call stack blows up and I hit the recursion limit (default of 1,000 in most cases, iPython seems to be 3,000).
+> A recursive approach would also generally work. Unfortnately, when I've tried to create even medium-sized models using recursive calls, the call stack blows up and I hit the recursion limit (default of 1,000 frames typically).
 
-The growth function needs to know the periods over which to compound. We can start by creating a generator function that drives each period of the model.
+The cash flow function needs to know the periods over which to compound. We can start by creating a generator function that drives each period of the model.
 
 ```python
 from datetime import date
@@ -47,7 +47,7 @@ s = statement.periods()
 ```
 > `RelativeDelta` is a Pydantic-compatible version of `dateutil.relativedelta.relativedelta`. Read about it in this [previous post](https://jrdnh.github.io/posts/pydantic-with-third-party-types/), or copy the code from [this Gist](https://gist.github.com/jrdnh/ba4936f8e403f968c1f9b7f85f828333).
 
-Now that we have a function that yields the compounding periods, we can create a function that calculates the growth for each period and returns the cumulative sum between the two dates. For example using the `revenue` line item:
+Now that we have a function that yields the compounding periods, we can add a function that calculates the appropriate flows. For example using the `revenue` line item:
 
 ```python
 class Statement(BaseModel):
@@ -79,9 +79,9 @@ class Statement(BaseModel):
         return accum_revenue
 ```
 
-There's a lot of code, but it is straight forward. First, a reference revenue amount and annual growth attributes were added. Note that in this case the `ref_revenue` is the amount or revenue for the period ending on `ref_date`. In other words, revenue for the first period of the model equals `ref_revenue * (1 + rev_growth * year_frac)`.
+First, add attributes for the starting amount of revenue and annual growth rate. Note that in this case the `ref_revenue` is the amount or revenue for the period ending on `ref_date`. In other words, revenue for the first period of the model equals `ref_revenue * (1 + rev_growth * year_frac)`.
 
-The `revenue` function initializes a variable to hold accumulated revenue between the two input dates and a variable to hold revenue for the current period. For each `period`, the function checks if we've gone past the `to_date` and breaks if so. Otherwise, it calculates revenue for the periods and the appropriate amount to `accum_revenue` for any portion of the period that overlaps with the input dates.
+The `revenue` function initializes a variable to hold accumulated revenue between the two input dates and a variable to hold revenue for the current period. For each `period`, the function checks if we've gone past the `to_date` and breaks if so. Otherwise, it calculates revenue for the current period and adds it to the accumulated revenue (for any portion of the current period that overlaps with the input dates).
 
 ```python
 statement = Statement(
@@ -101,7 +101,7 @@ s = statement.periods()
 
 ## Refactor to make it a bit more generic
 
-Great, the operating statement has a revenue line item. It would be great fixed costs next. We could model fixed costs using the same method: initial value that grows at an annual rate, compounding over each period. The code is almost exactly the same as `revenue`. This is a common pattern, so we could pull it out into a separate function.
+The operating statement has a revenue line item. Let's add a line for fixed costs next. We could model fixed costs using the same method: an initial value that grows at an annual rate, compounding over each period. The code is almost exactly the same as `revenue`. This is a common pattern, so let's pull it out into a separate function.
 
 ```python
 from typing import Callable, Iterable
@@ -170,11 +170,11 @@ class Statement(BaseModel):
         )
 ```
 
-This is still a lot of code, but at least it's easier to add new line items to the operating statement. However, this model only works with `revenue` and `fixed_costs` compound at the same frequency. Additionally, `revenue` and `fixed_costs` are re-usable if we wanted to create another operating model. 
+This is still a lot of code, but at least it's easier to add new line items to the operating statement. However, this model only works with `revenue` and `fixed_costs` compound at the same frequency. Additionally, `revenue` and `fixed_costs` are not re-usable if we wanted to create another operating model. 
 
 There are two main concepts here. 
-1. A **driver function** that yield each period in the series. In this case, each period is at a fixed interval, but you could easily imagine other scenarios.
-2. A **growth function** that accumulates the flow. In this case, it is based *i)* on a constant annual growth rate, and *ii)* the pro rata portion of an partial beginning or stub periods. In other cases, the growth rate might not be constant or the flow should not be accrual for partial periods (e.g. cash accounting for payments received on the final day of the period).
+1. A **driver function** that yields each successive period in the series. In this case, each period is at a fixed interval, but you could easily imagine other scenarios.
+2. A **growth function** that accumulates the flow over the appropriate period. In this case, accumulation is based *i)* on a constant annual growth rate, and *ii)* the proportionate amount of any overlapping periods. In other cases, the growth rate might not be constant or the accumulation function might not include partial periods (e.g. cash accounting for payments received on the final day of the period).
 
 Let's create driver and growth classes that we can use for `revenue` and `fixed_costs`.
 
@@ -212,7 +212,9 @@ class OperatingStatement(BaseModel):
         return self.revenue(from_date, to_date) - self.fixed_costs(from_date, to_date)
 ```
 
-This is the extent of the line item modeling we are going to do here. If we were building out a full three statement model in practice, we'd probably want to think through the common patterns and create a more robust set of helper classes. For example, we might have line items with contingent events (e.g. an earnout paid when certain performance metrics are achieved) where driver periods are dynamic. Or you might want to different short- and long-term growth rates.
+`FixedPeriodSeries` is the period driver function. It yield periods based on a fixed time interval. The `GrowingSeries` class is the growth function. It determines amount based on fixed annual growth and includes partial periods. They are tied together to reflect the chosen modeling structure.
+
+This is the extent of the line item modeling we are going to do here. If we were building out a full three statement model in practice, we'd probably want to think through the common patterns and create a more robust set of helper classes. For example, we might have line items with contingent events (e.g. an earnout paid when certain performance metrics are achieved) where driver periods are dynamic. Or you might want to different short- and long-term growth rates. Having the growth function inherit from the driver function may not make sense in a larger model either.
 
 ```python
 start_date = date(2019, 12, 31)
@@ -238,9 +240,9 @@ statement.revenue(start_date, date(2020, 12, 31))  # revenue for the next year
 # 12670.746995800495
 ```
 
-This setup allows us to nicely access line items (and sub-line items if we had anything) using regular dot notation since the are regular attributes.
+This setup allows us to nicely access line items (and sub-line items if we had anything) using regular dot notation since each line item is a regular attribute.
 
-We can confirm that there aren't any recursion issues as well. We recreate the same model with daily revenue compounding and calculate total income over the next 10,000 days (December 31, 2019 to May 18, 2047).
+We can confirm that there aren't any recursion issues as well. We can recreate the same model with *daily* revenue compounding and calculate total income over the next 10,000 days (December 31, 2019 to May 18, 2047).
 
 ```python
 daily_statement = OperatingStatement(
@@ -265,9 +267,9 @@ daily_statement.revenue(start_date, end_date)
 
 ## Prettier outputs
 
-One of the great things about Excel is that you can easily see the data. Every cell is visible. It would be really nice to present the data in a familiar format here: periods as columns and line items as rows.
+One of the great things about Excel is that you can see the data easily. Every cell is visible. It would be really nice to present the outputs in a familiar format here: periods as columns and line items as rows.
 
-Each node in our model is a callable Pydantice `BaseModel`. We can create some helper functions to iterate over each field in the model and recursively call the node for each period. This will give us a nested dictionary of values prepresenting our pro forma model.
+Each node in our model is a callable Pydantic `BaseModel`. We can create some helper functions to iterate over each model field and recursively call the node for each period. This will give us a nested dictionary of values representing our pro forma model.
 
 ```python
 def field_values(series: BaseModel, periods):
@@ -284,8 +286,8 @@ def field_values(series: BaseModel, periods):
     values.update({"": [series(*period) for period in periods]})
     return values
 ```
+Let's print out the first year of the model monthly.
 ```python
-
 from itertools import pairwise
 import json
 
@@ -331,7 +333,7 @@ print(json.dumps(flat_pro_forma, indent=2))
 # }
 ```
 
-Incorporating these pretty outputs into the base objects would be a natural next step. I'll leave that as an exercise for the later.
+Incorporating these pretty outputs into the base objects would be helfpul, but I'm not going to spend the time to do that here.
 
 The pretty pro forma dictionary makes exporting results to `pandas` easy. From there, you could easily copy to the clipboard or save to Excel.
 
@@ -353,7 +355,7 @@ print(df)
 
 ## Saving and loading models
 
-We haven't exploited the power of Pydantic yet. In fact, nothing so far requires Pydantic. However, it gives us a really nice way to separate our data from our models. We can save our data somewhere else, load it into our model when we want to evaluate some metric, and then serialize it back out to some persistent storage with any updates. 
+We haven't exploited the power of Pydantic yet. In fact, nothing so far really requires Pydantic. However, it gives us a nice way to separate our data from our models. We can save our data somewhere else, load it into our model when we want to evaluate some metric, and then serialize it back out to some storage with any updates. It also gives third-parties a way to update the data independently of the model.
 
 ```python
 # write the model to a file
@@ -375,11 +377,11 @@ with open("my_company.json", "r") as f:
 assert new_statement.revenue.growth_rate == 0.15
 ```
 
-Difficulty interacting with external data sources is one of the biggest challenges with Excel. Pydantic makes it significantly easier to deal with serializing to and validating data from external sources. In some cases you may need to create custom serializers or validators, but that is outside the scope of this post.
+Difficulty interacting with external data sources is one of the biggest challenges with Excel. Pydantic makes it significantly easier to deal with serializing to and validating data from external sources. In some cases you may need to create custom serializers or validators, but that it's much more flexible than Power Query or VBA.
 
 ## Final thoughts
 
-This is a very basic example. It's not at all clear that it scales well to larger or more complex models. The hierarchical structure around the financial statements works well, but without better ways to explore the structure visually it would be difficult to figure out how a more complex model is constructed (not that stepping through someone else's workbook is any easier). Ripe for improvements, and perhaps a different approach altogether.
+This is a very basic example. It's not at all clear that it scales well to larger or more complex models. The hierarchical structure around the financial statements works well, but without better ways to explore the structure visually it would be difficult to figure out how a complex model is constructed (not that stepping through someone else's workbook is any easier). Ripe for improvements, and perhaps a different approach altogether.
 
 The full code for this post can be found [here](https://gist.github.com/jrdnh/7621762c23157bb093ca629a0491201e).
 
