@@ -4,13 +4,13 @@ date = 2024-01-15T11:15:39-05:00
 draft = false
 +++
 
-*This post creates a model that mirrors the Excel workbook [here](https://gist.github.com/jrdnh/fb26772b430283344d887916b4609979).*
+*This post creates a model that mirrors the spreadsheet [here](https://docs.google.com/spreadsheets/d/1iRkhis-IToZ07XGRHkGxtLfSU2PhwP7tGWMgULRAjSw/edit?usp=sharing).*
 
-This post discusses a simple financial model for a multifamily property. The objective is to create an interactive financial model with structured hierarchy for operating line items and sub-items. For example, net operating income (NOI) should be accessed with:
+The objective of this post is to create a financial model for an apartment building. Each line item of the operating model should accept arbitrary `from_date` and `to_date` parameters. For example, net operating income (NOI):
 ```python
 noi(from_date=date(yyyy, mm, dd), to_date=date(yyyy, mm, dd))
 ```
-Sub-items, effective gross income (EGI) and operating expenses (opex) in the case of NOI, should similarly be accessible all the way down the basic operating assumptions.
+Sub-items, effective gross income (EGI) and operating expenses (opex) in the case of NOI, should be accessible as attributes all the way down the basic operating assumptions.
 ```python
 noi.egi(from_date=date(yyyy, mm, dd), to_date=date(yyyy, mm, dd))
 noi.opex(from_date=date(yyyy, mm, dd), to_date=date(yyyy, mm, dd))
@@ -18,11 +18,9 @@ noi.opex(from_date=date(yyyy, mm, dd), to_date=date(yyyy, mm, dd))
 # net operating income > effective gross income > potential gross rent > average monthly rent per square foot
 noi.egi.gross_potential_rent.avg_monthly_rent_psf(from_date=date(yyyy, mm, dd), to_date=date(yyyy, mm, dd))
 ```
-Line items should accept any arbitrary `from_date` and `to_date`. Annual, quarterly, monthly, or intra-period dates might be required depending on the context of analysis.
+Finally, the model needs to be able to match the equivalent Excel model. In particular, it should be able to capture discrete period changes (to mirror an Excel model where columns represent months) even though line item functions should accept arbitrary date ranges.
 
-Finally, the model needs to be able to match the equivalent Excel model. For example, we want the ability to capture the effect of discrete monthly changes (to mirror an Excel model where columns represent months) even though line item functions should accept arbitrary date ranges.
-
-This post discusses some of the successes and challenges in meeting these modeling objectives, it isn't a definitive guide. It also does not step through every step of creating this model.
+This post discusses some of the successes and challenges in meeting these modeling objectives. It isn't a definitive guide. It also does not step through every line of the companion files.
 
 * [Companion file setup](#companion-file-setup)
 * [Model construction](#model-construction)
@@ -36,10 +34,10 @@ This post discusses some of the successes and challenges in meeting these modeli
 
 ## Companion file setup
 
-The three companion files for this post are in [this Gist](). The files are:
+The three companion files for this post are in [this Gist](https://gist.github.com/jrdnh/fb26772b430283344d887916b4609979). The files are:
 * `models.py` - Pydantic-compatible wrappers `relativedelta` similar to the ones in [this previous post](https://jrdnh.github.io/posts/pydantic-with-third-party-types/), and a `FixedIntervalSeries` class that yields a series of dates at a fixed interval similar to the class in [this previous post](https://jrdnh.github.io/posts/basic-financial-modeling-with-python/#refactor-to-make-it-a-bit-more-generic).
-* `utils.py` - Utility functions for working with dates, `Iterators`, and printing.
-* `companion.py` - The companion script that creates the model.
+* `utils.py` - Utility functions for working with dates, iterables, and printing.
+* `companion.py` - The companion script that creates and runs the model.
 
 The companion files were created with Python 3.12 and use `pydantic==2.5.2` and `python-dateutil==2.8.2`. Other versions may work but have not been tested.
 
@@ -74,13 +72,13 @@ NetOperatingIncome
         └── rr_growth_rate: float 
 ```
 
-Each class is a callable that takes `from_dt: date` and `to_dt: date` arguments and returns the total (or in some cases average) line item value from but excluding the first date to and including the second date. This argument convention aligns with using consecutive `(start date, end date]` periods.
+Each class is a callable that takes `from_dt: date` and `to_dt: date` arguments and returns the total (or in some cases average) line item value. Values are from but excluding the first date, and to and including the second date. This argument convention aligns with using consecutive `(start date, end date]` periods.
 
 ## Line item classes
 
-Building line items as class instances with subitems as attributes gives the model structure. Subitems are accessible through regular dot notation. Each line items is a separate class, although `OperatingExpenses`, `RealEstateTaxes`, and `ReplacementReserves` are essentially the same classes with different property names. This type of periodic growth is a common pattern, so it might make sense to abstract these lines into a separate class.
+Building line items as class instances with subitems as attributes gives the model structure. Subitems are accessible through regular dot notation. Each line item is a separate class, although `OperatingExpenses`, `RealEstateTaxes`, and `ReplacementReserves` are essentially the same classes with different property names. Each of these three classes model expenses that start at some value and grow stepwise at some specified, fixed interval (monthly, semi-annually). This type of periodic growth is a common pattern, so it might make sense to abstract these lines into a separate class.
 
-Not shown in the overview diagram above is that each line item class is a subclass of `FixedIntervalSeries` from the `models.py` file. The `FixedIntervalSeries` class takes `ref_date: date` and `freq: RelativeDelta` constructor parameters. It has a single method `periods` that returns a generator yielding a series of dates with an even offset defined by the `freq` property.
+Each line item class is a subclass of `FixedIntervalSeries` from the `models.py` file. The `FixedIntervalSeries` class takes `ref_date: date` and `freq: RelativeDelta` constructor parameters. It has a single method `periods` that returns a generator yielding a series of dates with a constant offset defined by the `freq` property.
 
 ```python
 class FixedIntervalSeries(BaseModel):
@@ -104,7 +102,7 @@ from models import FixedIntervalSeries, RelativeDelta
 series = FixedIntervalSeries(ref_date=date(2020, 1, 1), freq=relativedelta(months=1))
 series_generator = series.periods()
 print([next(series_generator) for _ in range(3)])
-[datetime.date(2020, 1, 1), datetime.date(2020, 2, 1), datetime.date(2020, 3, 1)]
+# [datetime.date(2020, 1, 1), datetime.date(2020, 2, 1), datetime.date(2020, 3, 1)]
 ```
 
 Or using `itertools.pairwise`, create series of `(start_date, end_date)` tuples defining both edges of a period.
@@ -113,12 +111,12 @@ Or using `itertools.pairwise`, create series of `(start_date, end_date)` tuples 
 from itertools import islice, pairwise
 
 list(islice(pairwise(series.periods()), 2))
-[(datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)), (datetime.date(2020, 2, 1), datetime.date(2020, 3, 1))]
+# [(datetime.date(2020, 1, 1), datetime.date(2020, 2, 1)), (datetime.date(2020, 2, 1), datetime.date(2020, 3, 1))]
 ```
 
-The `periods` function provides the time events required to calculate discrete time interval values. Note that most of the `periods` functions in this model yield evenly spaced dates, but yielding the next eventful date (regardless of time interval) is the only requirement.
+The `periods` function provides the time events required to calculate discrete time intervals. Note that most of the `periods` functions in this model yield evenly spaced dates, but yielding the next eventful date (regardless of time interval) is the only requirement.
 
-Looping over `periods`, in combination with `itertools.takewhile` and year fraction functions gives us a way to calculate values dependent on discrete intervals over arbitrary time periods. The annotated `RealEstateTaxes` class shows how you can calculate tax expense that increases a fixed percentage at fixed intervals. Initializing with `freq=RelativeDelta(years=1)` and `ret_growth_rate=0.05` would step up the expense by 5.0% on the anniversary of each `ref_date`.
+Looping over `periods`, in combination with `itertools.takewhile` and year fraction functions, gives us a way to calculate values dependent on discrete intervals over arbitrary time periods. The annotated `RealEstateTaxes` class shows how you can calculate tax expense that increases a fixed percentage at fixed intervals. Initializing with `freq=RelativeDelta(years=1)` and `ret_growth_rate=0.05` would step up the expense by 5.0% on the anniversary of each `ref_date`.
 
 ```python
 class RealEstateTaxes(FixedIntervalSeries):
@@ -145,7 +143,7 @@ class RealEstateTaxes(FixedIntervalSeries):
         return accumulated_amt
 ```
 
-This approach uses the actual dates in each period to determine tax expense for each period. It would be less code to just increase the tax expense each period with something like this.
+This approach uses the actual dates in each period to determine tax expense for each period. It would be less code to just increase the tax expense each period by multiplying the previous period's expense by the growth rate:
 
 ```python
     def __call__(self, from_dt: date, to_dt: date):
@@ -183,7 +181,7 @@ The `monthly` function returns one 1/12th for each whole calendar month and the 
 <tbody>
   <tr>
     <td class="tg-0pky">Whole non-calendar months<br><span style="font-weight:400;font-style:normal;text-decoration:none">(e.g. 2020-06-15 to 2020-07-15)</span><br></td>
-    <td class="tg-0pky">Equals 1/12th of a year<br><br><span style="color:#905;background-color:#DDD">=YEARFRAC("2020-06-15", "2020-07-15", 0)</span><br>0.08333333333333333```</td>
+    <td class="tg-0pky">Equals 1/12th of a year<br><br><span style="color:#905;background-color:#DDD">=YEARFRAC("2020-06-15", "2020-07-15", 0)</span><br>0.08333333333333333</td>
     <td class="tg-0pky">Depends whether the stub starting month and ending month <br>have the same number of days<br><span style="color:#905;background-color:#DDD">&gt;&gt;&gt; YF.monthly(date(2020,6,15), date(2020,7,15))</span><br>0.08198924731182795</td>
   </tr>
   <tr>
@@ -199,7 +197,7 @@ The `monthly` function returns one 1/12th for each whole calendar month and the 
 </tbody>
 </table>
 
-`YF.monthly` allows you to create discrete, even calendar month accruals and growth rates from two `date`s. While not necessarily required to develop a good model, it is helpful when trying to tie back to an Excel model where users model monthly columns of data with `amount or rate/12`.
+`YF.monthly` allows you to create discrete, even calendar month accruals and growth rates from two `date`s. While not necessarily required to develop a good model, it is helpful when trying to tie back to an Excel model where users model monthly columns of data.
 
 
 ## Model usage
@@ -231,7 +229,7 @@ noi.effective_gross_income.gross_potential_rent.avg_monthly_rent_psf(date(2021, 
 # 3.292631202107785
 ```
 
-Line items are `FixedIntervalSeries` instances. If we want to display the full pro forma for all line items on a monthly basis, we can recursively iterate over each attribute and try calling it with a series of monthly periods. The `utils.py` helper `field_values` creates a nested dictionary of line items with their values, and `flatten` flatten the dictionary.
+Line items are `FixedIntervalSeries` instances. If we want to display the full pro forma for all line items on a monthly basis, we can recursively iterate over each attribute and try calling it with a series of monthly periods. The helper `field_values` creates a nested dictionary of line items with their values, and `flatten` flattens the dictionary.
 
 ```python
 from itertools import pairwise
@@ -241,7 +239,7 @@ from models import RelativeDelta
 ten_years_monthly = list(pairwise((date(2019, 12, 31) + RelativeDelta(months=1) * i for i in range(121))))
 pro_forma = flatten(field_values(noi, ten_years_monthly))
 print(json.dumps(pro_forma, indent=2))
-# json output
+# long json output
 ```
 
 Pandas displays tables nicely. It is also easy to copy DataFrames to the clipboard or write directly to a `.xlsx` file. Make sure you have `pandas` installed before running the following code.
@@ -269,14 +267,14 @@ print(df)
 
 ## Challenges with this approach
 
-* **Sibling dependencies:** You might have noticed that vacancy is modeled using a method of `EffectiveGrossIncome` instead of as a custom class. That's because it relies on gross potential rent which is a sibling in the hierarchy (vacany expense = gross potential rent * vacancy rate). For more complicated leasing arrangements such as net leases, reimbursement lines in the revenue section rely on lines buried all they way down in the expense section of the statement. There dependencies down the tree work well, but dependencies up and across the tree are difficult to navigate.
+* **Sibling dependencies:** You might have noticed that vacancy is modeled using a method of `EffectiveGrossIncome` instead of as a custom class. That's because it relies on gross potential rent which is a sibling in the hierarchy (vacany expense = gross potential rent * vacancy rate). For more complicated leasing arrangements such as net leases, reimbursement lines in the revenue section rely on lines buried all they way down in the expense section of the statement. Using dependencies down the tree work well, but dependencies up and across the tree are difficult to navigate.
 * **Assumption references:** If you [look](https://gist.githubusercontent.com/jrdnh/377f13e0ed0e6ac975b5d36156dd27f5/raw/44bb448d60ff6aae9cc5f5d9472edf9e0c0b85d3/noi.json) at the serialized assumptions for this model you'll see a lot of the same values. In this case, all the `ref_date`s are the same analysis start date of December 12, 2019. If you wanted to change the analysis start date, you'd have to update the assumption in many places.
-* **Performance:** The `periods` date generators are inefficient. Calculating a full 10-year schedule of monthly values for all line items takes more than a third of second. `periods` is called almost 25,000 times. Practical models generally have mid to high hundreds of line items which implies this model is too slow to be useful. `periods` is a good candidate for caching though, both within subclasses and potentiall across subclasses, since the same arguments are called repeatedly and generator outputs are small. A future post will explore caching `periods`.
+* **Performance:** The `periods` date generators are inefficient. Calculating a full 10-year schedule of monthly values for all line items takes more than a third of second. `periods` is called almost 25,000 times. Practical models generally have mid to high hundreds of line items which implies this model is too slow to be useful. `periods` is a good candidate for caching though, both within subclasses and potentially across subclasses, since the same arguments are called repeatedly and generator outputs are small.
 
 
 ### Performance and profiling details
 
-Time to create a full 10-year schedule of monthly values.
+Time duration to create a full 10-year schedule of monthly values.
 ```python
 from time import perf_counter
 
@@ -318,4 +316,4 @@ stats.print_stats(10)
 #     21358    0.030    0.000    0.049    0.000 /.../dateutil/relativedelta.py:231(_fix)
 #     24598    0.030    0.000    0.613    0.000 /.../models.py:105(periods)
 ```
-Most of the time is spent creating, multiplying, and adding `dateutil.relativedelta.relativedelta` objects inside the body of `FixedIntervalSeries.periods`. `FixedIntervalSeries.periods` is called almost 25,000 times (see last line).
+Most of the time is spent creating, multiplying, and adding `dateutil.relativedelta.relativedelta` objects inside the body of `FixedIntervalSeries.periods`. `FixedIntervalSeries.periods` is called almost 25,000 times (see last line or results table).
