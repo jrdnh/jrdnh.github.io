@@ -1,0 +1,10 @@
+baseURL = "https://jrdnh.github.io"
+defaultContentLanguage = "en"
+theme = "congo"
+
+enableRobotsTXT = true
+paginate = 15
+summaryLength = 0
+
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
