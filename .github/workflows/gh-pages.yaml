@@ -5,16 +5,16 @@ name: GitHub Pages
 on:
   push:
     branches:
-      - main
+      - main # change to the branch name for your project
 
 jobs:
   build-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
         with:
           submodules: true
           fetch-depth: 0
@@ -23,10 +23,9 @@ jobs:
         uses: peaceiris/actions-hugo@v2
         with:
           hugo-version: "latest"
-          extended: true
 
       - name: Build
-        run: hugo --minify --configDir config/_default
+        run: hugo --minify
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
