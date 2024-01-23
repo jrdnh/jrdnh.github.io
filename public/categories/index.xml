@@ -3,12 +3,9 @@
   <channel>
     <title>Categories on jrdnh</title>
     <link>https://jrdnh.github.io/categories/</link>
-    <description>jrdnh (Categories)</description>
+    <description>Recent content in Categories on jrdnh</description>
     <generator>Hugo -- gohugo.io</generator>
-    <language>en-us</language>
-    
+    <language>en</language>
     <atom:link href="https://jrdnh.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
-    
-    
   </channel>
 </rss>
