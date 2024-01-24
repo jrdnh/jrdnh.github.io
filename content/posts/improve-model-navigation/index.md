@@ -1,7 +1,7 @@
 +++
 title = 'Improve Model Navigation'
 date = 2024-01-23T21:27:24-05:00
-draft = true
+draft = false
 +++
 
 *The full example code for this post is [here](https://github.com/jrdnh/blog-files/tree/main/improve-model-navigation).*
