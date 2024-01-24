@@ -4,13 +4,13 @@ date = 2024-01-23T21:27:24-05:00
 draft = false
 +++
 
-*The full example code for this post is [here](https://github.com/jrdnh/blog-files/tree/main/improve-model-navigation).*
+*The full example code for this post is [here](https://github.com/jrdnh/blog-files/blob/main/improve-model-navigation/example.py).*
 
-A key limitation with the financial model from the [last post ](https://jrdnh.github.io/posts/create-a-multifamily-financial-model-in-python/) was that line items could only reference subitems. Sibling and parents were unreachable. This post improves the hierarchical structure to make line items in the structure accessible to each other while preserving autocompletion and type hints.
+A key limitation with the financial model from the [last post ](https://jrdnh.github.io/posts/create-a-multifamily-financial-model-in-python/) was that line items could only reference subitems. Siblings and parents were unreachable. This post improves the hierarchical structure to make all line items accessible to each other while preserving autocompletion and type hints.
 
 ## Making the `parent` accessible
 
-As a refresher from the previous model, line items are modeled as callable classes. Each line item may hold subitems as attributes. A simple model might look like this:
+As a refresher from the previous model, line items are represented by callables. Each line item may hold subitems as attributes. A simple model might look like this:
 
 ```
 NetIncome
@@ -19,10 +19,9 @@ NetIncome
     └── VariableExpenses
 ```
 
-We can navigate down the tree with regular attribute access (e.g. `NetIncome().revenue`). We can navigate back up the tree by creating a `parent` attribute for each line item node. Since we want to avoid memory leaks and parent nodes already hold a reference to each child node, we can create a managed property for `parent` that holds a weak reference to the parent object.
+We can navigate down the tree with regular attribute access (e.g. `NetIncome().revenue`). We can navigate back up the tree by adding a `parent` attribute to the class for each line item. Since we want to avoid memory leaks where parents and children hold cyclical references to each other, we can make the reference to the `parent` weak and wrap it in a managed property to set and get it properly.
 
-Since we want autocompletion to work across the entire structure, we also need to make the node class generic with respect to its parent type. This will allow us to get good autocompletion and type hints for typing things like `expenses.parent.revenue` to navigate from the expenses line to the revenue line.
-
+We want autocompletion to work across the entire structure, so we also need to make the node class generic with respect to its parent type. This will allow us to get good autocompletion and type hints for paths like `expenses.parent.revenue` navigating up to the parent and then back down to a sibling.
 
 ```python
 import weakref
@@ -68,8 +67,9 @@ child.parent = Parent(luftballons=99)
 
 child.parent.luftballons
 ```
-
+Attributes of `parent` receive good autocompletion,
 ![ autocompletion](images/autocompletion.png)
+and correct type hints.
 ![type hint](images/typehint.png)
 
 
@@ -91,13 +91,14 @@ class Node[P](BaseModel):
         """Find first parent node with class `cls`."""
         if isinstance(self.parent, cls):
             return self.parent
+        # if the immediate parent doesn't match, try its parent
         try:
             return self.parent.find_parent(cls)  # type: ignore
         except AttributeError:
             raise ValueError(f"No parent of type {cls} found.")
 ```
 
-Note that subclasses of `cls` will be returned in this implementation. Depending on the desired behavior, strict class comparison (or a function argument for strict comparison) might be appropriate.
+Note that subclasses of `cls` will match and be returned in this implementation. Depending on the desired behavior, strict class comparison (or a function argument to require strict comparison) might be appropriate.
 
 ## Setting the `parent` attribute
 
@@ -115,13 +116,13 @@ class Node[P](BaseModel):
                 v.parent = self
 ```
 
-After the model has been initialized, the hook iterates over each model attribute and sets the attribute's parent to `self` if it is a `Node` object.
+After the model has been initialized, the hook iterates over each model attribute and sets the attribute's parent to `self` if it is a `Node` (or subclass of a `Node`) object.
 
-`pydantic.BaseModel` subclasses do *not* store attributes with a leading underscore in the object's `__dict__` (which is what is iterated over in the for-loop with Pydantic models). Instead, they are stored separately in a separate `__private_attributes__` property. If the `_parent` attribute was stored in the object's `__dict__` we would also have to make sure that we don't try to set the parent's `_parent` property to itself.
+`pydantic.BaseModel` subclasses do *not* store attributes with a leading underscore in the object's `__dict__` (which is what is iterated over in the for-loop with Pydantic models). Instead, they are stored separately in a separate `__private_attributes__` property. If the `_parent` attribute were stored in the object's `__dict__` (like it would be for a regular, non-`BaseModel` class) we would also have to make sure that we don't try to set the parent's `parent` property to itself.
 
 ## Navigating a simple model
 
-Using the `Node` class, we can now reference line items up and across the model. A simple model that reflects the structure at the top of the post is below. Revenue is modeled as a single line. Expenses includes both fixed expenses of `100` plus variable expenses. Variable expenses equal 60% of revenues, and requires the `VariableExpenses` class to navigate up and over to the `Revenue` class.
+We can now reference line items up and across the model using the `Node` class. A simple model that reflects the structure at the top of the post is below. Revenue is modeled as a single line. Expenses includes both fixed expenses of `100` plus variable expenses from a subitem. Variable expenses equal 60% of revenues, and require the `VariableExpenses` class to navigate up and over to the `Revenue` class.
 
 This is a *simple* model. All values are hardcoded into the function. It is purely meant to demonstrate how the `Node` class helps climb the model structure.
 
@@ -154,7 +155,7 @@ class NetIncome(Node[None]):
         return self.revenue(year) + self.expenses(year)
 ```
 
-We can confirm it works as expected.
+Confirm it works as expected.
 
 ```python
 income = NetIncome(revenue=Revenue(), expenses=Expenses(variable=VariableExpenses()))
@@ -164,5 +165,6 @@ income(2025)
 
 ## Final thoughts
 
-**Protocols:** Typing for `parent` and in `find_parent` isn't limited to concrete classes. You can use protocols introduced in [PEP 544](https://peps.python.org/pep-0544/) and added in Python 3.8 to define or match parents using structural subtyping. Protocols allow you to define or match parents based on a class interface without the underlying implementation. 
-**Validation:** `Node` currently does not validate that its parent matches the type declared in concrete subclasses. This could lead to differences between the type hints and actual parent type.
+**Protocols:** Typing for `parent` and in `find_parent` isn't limited to concrete classes. You can use protocols introduced in [PEP 544](https://peps.python.org/pep-0544/) and added in Python 3.8 to define or match parents using structural subtyping.
+
+**Validation:** `Node` currently does not validate that its parent matches the type declared in concrete subclasses. This could lead to differences between the type hints and actual parent type. Adding validation would help avoid such issues.
