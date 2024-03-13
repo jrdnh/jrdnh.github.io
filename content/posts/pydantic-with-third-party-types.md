@@ -90,7 +90,7 @@ class WeekdayAnnotations(BaseModel):
     n: int | None = None
 
     @model_validator(mode="wrap")
-    def _validate(value, handler) -> relativedelta:
+    def _validate(value, handler) -> weekday:
         # if already dateutil._common.weekday instance, return it
         if isinstance(value, weekday):
             return value
