@@ -69,10 +69,10 @@ fingerprintAlgorithm = "sha256"
   showTermCount = true
 
 [fathomAnalytics]
-  # site = "ABC12345"
+  # site = "jrdnh.github.io"
 
 [plausibleAnalytics]
-  domain = "jrdnh.github.io"
+  # domain = "jrdnh.github.io"
   # event = ""
   # script = ""
 
