@@ -114,3 +114,5 @@ cs.value
 # pyright: 0 errors, 0 warnings, 0 informations
 # mypy: Success: no issues found in 1 source file
 ```
+
+Note that the setter will not work for classes with `__slots__` due to how they retrieve attributes.
