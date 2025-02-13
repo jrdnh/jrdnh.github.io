@@ -4,44 +4,51 @@
     <title>Posts on jrdnh</title>
     <link>https://jrdnh.github.io/posts/</link>
     <description>Recent content in Posts on jrdnh</description>
-    <generator>Hugo -- gohugo.io</generator>
+    <generator>Hugo</generator>
     <language>en</language>
-    <lastBuildDate>Tue, 23 Jan 2024 21:27:24 -0500</lastBuildDate>
+    <lastBuildDate>Sun, 09 Feb 2025 18:49:02 -0600</lastBuildDate>
     <atom:link href="https://jrdnh.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Override Python Properties With Simple Attributes</title>
+      <link>https://jrdnh.github.io/posts/override-python-property-with-simple-attribute/</link>
+      <pubDate>Sun, 09 Feb 2025 18:49:02 -0600</pubDate>
+      <guid>https://jrdnh.github.io/posts/override-python-property-with-simple-attribute/</guid>
+      <description></description>
+    </item>
     <item>
       <title>Improve Model Navigation</title>
       <link>https://jrdnh.github.io/posts/improve-model-navigation/</link>
       <pubDate>Tue, 23 Jan 2024 21:27:24 -0500</pubDate>
       <guid>https://jrdnh.github.io/posts/improve-model-navigation/</guid>
-      <description>The full example code for this post is here.</description>
+      <description></description>
     </item>
     <item>
       <title>Create a Multifamily Financial Model in Python</title>
       <link>https://jrdnh.github.io/posts/create-a-multifamily-financial-model-in-python/</link>
       <pubDate>Mon, 15 Jan 2024 11:15:39 -0500</pubDate>
       <guid>https://jrdnh.github.io/posts/create-a-multifamily-financial-model-in-python/</guid>
-      <description>This post creates a model that mirrors the spreadsheet here.</description>
+      <description></description>
     </item>
     <item>
       <title>Basic Financial Modeling With Python</title>
       <link>https://jrdnh.github.io/posts/basic-financial-modeling-with-python/</link>
       <pubDate>Sun, 07 Jan 2024 15:28:54 -0500</pubDate>
       <guid>https://jrdnh.github.io/posts/basic-financial-modeling-with-python/</guid>
-      <description>Spreadsheets remain undefeated for financial modeling1.</description>
+      <description></description>
     </item>
     <item>
       <title>Caching Generator Methods in Python</title>
       <link>https://jrdnh.github.io/posts/caching-generator-methods-in-python/</link>
       <pubDate>Sat, 30 Dec 2023 13:25:41 -0500</pubDate>
       <guid>https://jrdnh.github.io/posts/caching-generator-methods-in-python/</guid>
-      <description>Each code snippet should run as a standalone example (based on Python 3.</description>
+      <description></description>
     </item>
     <item>
       <title>Pydantic With Third Party Types</title>
       <link>https://jrdnh.github.io/posts/pydantic-with-third-party-types/</link>
       <pubDate>Wed, 13 Dec 2023 21:52:40 -0500</pubDate>
       <guid>https://jrdnh.github.io/posts/pydantic-with-third-party-types/</guid>
-      <description>Validating and structuring data models with Pydantic is a breeze, until you need to use incompatible third-party data types.</description>
+      <description></description>
     </item>
   </channel>
 </rss>
